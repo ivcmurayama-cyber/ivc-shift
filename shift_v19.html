@@ -932,9 +932,9 @@ function autoAdjustOverstaffed(d){
       if(cntR>reqR)remaining.push(hr+"〜"+(hr+1)+"時 過多+"+(cntR-reqR));
     }
     if(remaining.length===0){
-      showToast("シフト過多を自動調整しました ✓");
+      showToast("シフト過多を自動調整しました ✓");gasSave();
     } else {
-      showToast("調整完了（残: "+remaining.join("・")+"は制約上解消できません）",4000);
+      gasSave();showToast("調整完了（残: "+remaining.join("・")+"は制約上解消できません）",4000);
     }
   } else {
     showToast("調整の必要はありません（または調整できません）");
@@ -1026,6 +1026,7 @@ function doUnconfirm(){
   shiftConfirmed=false;
   confirmedShiftData={};
   closeUnconfirmDialog();
+  gasSave();
   render();
   showToast("シフト確定を取り消しました");
 }
@@ -1075,7 +1076,7 @@ function adminPcCheck(){
     pcStep=2;pcNew2="";renderPcStep();
   } else {
     if(pcNew1!==pcNew2){document.getElementById("pc-err").textContent="PINが一致しません";pcStep=1;pcNew1="";pcNew2="";renderPcStep();return;}
-    adminPin=pcNew1;closePinChange();showToast("管理者PINを変更しました");
+    adminPin=pcNew1;closePinChange();showToast("管理者PINを変更しました");gasSave();
   }
 }
 function buildPcPad(){
@@ -1165,6 +1166,7 @@ function gasLoad(callback){
         if(d.breakMargin1!==undefined)breakMargin1=d.breakMargin1;
         if(d.breakMargin2!==undefined)breakMargin2=d.breakMargin2;
         if(d.adjPriority)adjPriority=d.adjPriority;
+        if(d.staffTemplates)staffTemplates=d.staffTemplates;
         // 現在の期間データを復元
         var curKey=year+"-"+month+"-"+half;
         if(periodData[curKey]){
@@ -1208,7 +1210,8 @@ function gasSave(extraData){
     breakRules:breakRules,
     breakMargin1:breakMargin1,
     breakMargin2:breakMargin2,
-    adjPriority:adjPriority
+    adjPriority:adjPriority,
+    staffTemplates:staffTemplates
   };
   if(extraData)Object.keys(extraData).forEach(function(k){saveData[k]=extraData[k];});
   syncStatus="同期中";updateSyncIndicator();
@@ -1454,7 +1457,7 @@ function saveWorkHours(){
   showToast("勤務可能時間を "+s+":00〜"+e+":00 に設定しました");gasSave();
 }
 function switchSettingDay(dt){settingDayType=dt;document.getElementById("panel-setting").innerHTML=buildSetting();}
-function saveReq(){var dt=settingDayType;for(var hr=OPEN;hr<CLOSE;hr++){var el=document.getElementById("req-"+hr);if(el)reqData[dt][hr]=Math.max(0,parseInt(el.value)||0);}showToast((dt==="weekday"?"平日":"休日・祝日")+"の必要人数を保存しました");}
+function saveReq(){var dt=settingDayType;for(var hr=OPEN;hr<CLOSE;hr++){var el=document.getElementById("req-"+hr);if(el)reqData[dt][hr]=Math.max(0,parseInt(el.value)||0);}showToast((dt==="weekday"?"平日":"休日・祝日")+"の必要人数を保存しました");gasSave();}
 
 function buildWishOffRow(wo,d,nowPct){
   var sN=wo.name.replace(/'/g,"\\'");
@@ -1640,7 +1643,7 @@ function quickJoinShift(d,h){
   clearBreakCache();
   var panel=document.getElementById("panel-staff-confirmed");
   if(panel&&panel.classList.contains("active"))panel.innerHTML=buildStaffConfirmed();
-  showToast(fT(newIn)+"〜"+fT(newOut)+" でシフトに入りました");
+  showToast(fT(newIn)+"〜"+fT(newOut)+" でシフトに入りました");gasSave();
 }
 function openSsShift(d){ssTargetD=d;var sh=getShortageHours(d);var hn=hol(year,month+1,d);var dow=new Date(year,month,d).getDay();document.getElementById("ss-title").textContent=(month+1)+"月"+d+"日（"+DOW[dow]+"）"+(hn?"・"+hn:"");
   var existShift=currentStaff?(confirmedShiftData[key(currentStaff.name,d)]||null):null;
@@ -1693,8 +1696,8 @@ function saveSsShift(){if(ssTargetD===null||!currentStaff)return;var d=ssTargetD
 
 function openTmpl(){document.getElementById("tmpl-in").value="";document.getElementById("tmpl-out").value="";document.getElementById("tmpl-err").textContent="";document.getElementById("tmpl-box-sub").textContent=(currentStaff?currentStaff.name:"")+" のテンプレートに登録";document.getElementById("tmpl-overlay").classList.add("open");}
 function closeTmpl(){document.getElementById("tmpl-overlay").classList.remove("open");}
-function saveTmpl(){var r=vPair(document.getElementById("tmpl-in").value.trim(),document.getElementById("tmpl-out").value.trim());if(!r.ok){document.getElementById("tmpl-err").textContent=r.msg;return;}if(!staffTemplates[currentStaff.pin])staffTemplates[currentStaff.pin]=[];if(staffTemplates[currentStaff.pin].some(function(t){return t.inT===r.inVal&&t.outT===r.outVal;})){document.getElementById("tmpl-err").textContent="同じ時刻は既に登録されています";return;}staffTemplates[currentStaff.pin].push({inT:r.inVal,outT:r.outVal});closeTmpl();render();showToast(fT(r.inVal)+"〜"+fT(r.outVal)+" を登録しました");}
-function delTmpl(i){if(!staffTemplates[currentStaff.pin])return;staffTemplates[currentStaff.pin].splice(i,1);render();showToast("テンプレートを削除しました");}
+function saveTmpl(){var r=vPair(document.getElementById("tmpl-in").value.trim(),document.getElementById("tmpl-out").value.trim());if(!r.ok){document.getElementById("tmpl-err").textContent=r.msg;return;}if(!staffTemplates[currentStaff.pin])staffTemplates[currentStaff.pin]=[];if(staffTemplates[currentStaff.pin].some(function(t){return t.inT===r.inVal&&t.outT===r.outVal;})){document.getElementById("tmpl-err").textContent="同じ時刻は既に登録されています";return;}staffTemplates[currentStaff.pin].push({inT:r.inVal,outT:r.outVal});closeTmpl();render();showToast(fT(r.inVal)+"〜"+fT(r.outVal)+" を登録しました");gasSave();}
+function delTmpl(i){if(!staffTemplates[currentStaff.pin])return;staffTemplates[currentStaff.pin].splice(i,1);render();showToast("テンプレートを削除しました");gasSave();}
 function applyT(ti,d){var t=getMyTmpls()[ti];if(!t)return;var ie=document.getElementById("win-"+d),oe=document.getElementById("wout-"+d);if(ie)ie.value=String(t.inT);if(oe)oe.value=String(t.outT);updCard(d);}
 function updCard(d){var iv=document.getElementById("win-"+d),ov=document.getElementById("wout-"+d);var ivv=iv?iv.value.trim():"",ovv=ov?ov.value.trim():"";var c=document.getElementById("wcard-"+d);if(c){var base=c.className.replace(" has-shift","").replace(" is-off","");c.className=base+(ivv&&ovv?" has-shift":" is-off");}var e=document.getElementById("werr-"+d);if(e)e.textContent="";if(iv)iv.classList.remove("err");if(ov)ov.classList.remove("err");}
 function startPin(t){mode=t+"-pin";pinInput="";render();}
@@ -1930,7 +1933,7 @@ function updStaffPin(gi,si,inputEl){
   if(errEl){errEl.textContent="";errEl.style.display="none";}
   if(staffTemplates[oldPin]){staffTemplates[newPin]=staffTemplates[oldPin];delete staffTemplates[oldPin];}
   groups[gi].staff[si].pin=newPin;
-  showToast("PINを変更しました");
+  showToast("PINを変更しました");gasSave();
 }
 
 function delStaff(gi,si){groups[gi].staff.splice(si,1);document.getElementById("panel-staffmgmt").innerHTML=buildStaffMgmt();showToast("スタッフを削除しました");gasSave();}
