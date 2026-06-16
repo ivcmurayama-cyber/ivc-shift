@@ -821,9 +821,11 @@ function autoAdjustOverstaffed(d){
     overHours.sort(function(a,b){return b.over-a.over;});
     var targetH=overHours[0].h;
 
-    // targetHに在籍している候補（isPresentNetで判定）
+    // targetHに在籍している候補（isPresentNetで判定・社員は除外）
     var candidates=[];
-    groups.forEach(function(g){g.staff.forEach(function(s){
+    groups.forEach(function(g){
+      if(g.label==="社員")return; // 社員は調整対象外
+      g.staff.forEach(function(s){
       var sh=gConf(s.name,d)||null;
       if(!sh||sh==="off")return;
       if(!isPresentNet(sh,targetH,s.name,d))return;
