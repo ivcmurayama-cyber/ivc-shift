@@ -96,12 +96,15 @@ table.shift th.sc2{position:sticky;left:82px;z-index:4;background:var(--bg2)}
 .daily-tl-body{overflow:auto;padding:10px 14px 16px;flex:1}
 .tl-hours-row{display:flex;margin-left:120px;margin-bottom:5px}
 .tl-hour{font-size:10px;color:var(--txt2);flex-shrink:0;text-align:left}
-.tl-row{display:flex;align-items:center;margin-bottom:5px;min-height:34px;margin-top:16px}
-.tl-name-wrap{width:120px;flex-shrink:0;padding-right:8px;display:flex;flex-direction:column}
-.tl-name{font-size:11px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-row{display:flex;align-items:flex-start;padding:4px 0;margin-bottom:5px;min-height:34px;margin-top:16px}
+.tl-name-wrap{width:140px;flex-shrink:0;padding-right:8px;display:flex;flex-direction:column}
+.tl-name{font-size:11px;margin-top:1px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tl-wish-sub{font-size:9px;color:#854F0B;line-height:1.3}
 .tl-conf-sub{font-size:9px;color:var(--blue);font-weight:600;line-height:1.3}
-.tl-track{flex:1;position:relative;height:24px;background:var(--bg3);border-radius:4px;cursor:pointer;overflow:visible}
+.tl-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;margin-bottom:1px}
+.tl-tag{font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;color:#fff;white-space:nowrap;letter-spacing:0.2px;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.staff-tag-btn{font-size:10px;padding:2px 7px;border-radius:3px;border:1px solid;cursor:pointer;font-weight:600;margin:2px}
+.tl-track{flex:1;position:relative;height:24px;background:var(--bg3);border-radius:4px;cursor:pointer;overflow:visible;align-self:center}
 .tl-track:active{opacity:.8}
 .tl-bar{position:absolute;top:0;height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;overflow:hidden;white-space:nowrap}
 .tl-bar-c{background:#B5D4F4;color:var(--blue)}.tl-bar-w{background:#FAEEDA;color:#854F0B}
@@ -484,7 +487,9 @@ var breakRules=[
 ];
 var breakMargin1=3; // 第1優先：出退勤からの余白（時間）
 var breakMargin2=2; // 第2優先：出退勤からの余白（時間）
-var adjPriority="long-trim"; // 過多調整優先設定: "long-trim"=長いシフトを削る / "short-off"=短いシフトを休みにする
+var adjPriority="long-trim";
+var STAFF_TAGS=["新人","レジ","ドリンク","アサイー","ポキ","サンド","パンケーキ"];
+var TAG_COLORS={"新人":"#ef4444","レジ":"#f59e0b","ドリンク":"#3b82f6","アサイー":"#8b5cf6","ポキ":"#10b981","サンド":"#f97316","パンケーキ":"#ec4899"}; // 過多調整優先設定: "long-trim"=長いシフトを削る / "short-off"=短いシフトを休みにする
 var pinCounter=3000,staffTemplates={};
 var pcMode=null,pcStep=1,pcNew1="",pcNew2="";
 var settingDayType="weekday";
@@ -1459,6 +1464,40 @@ function saveWorkHours(){
 function switchSettingDay(dt){settingDayType=dt;document.getElementById("panel-setting").innerHTML=buildSetting();}
 function saveReq(){var dt=settingDayType;for(var hr=OPEN;hr<CLOSE;hr++){var el=document.getElementById("req-"+hr);if(el)reqData[dt][hr]=Math.max(0,parseInt(el.value)||0);}showToast((dt==="weekday"?"平日":"休日・祝日")+"の必要人数を保存しました");gasSave();}
 
+function renderTagCell(g,s,gi,si){
+  if(g.label!=="PA")return "<td></td>";
+  var html='<td style="padding:3px 4px;vertical-align:middle">';
+  STAFF_TAGS.forEach(function(tag){
+    var on=s.tags&&s.tags.indexOf(tag)>=0;
+    var c=TAG_COLORS[tag]||"#666";
+    var bg=on?c:"none";
+    var col=on?"#fff":"#999";
+    var bc=on?c:"#ccc";
+    html+="<button onclick=\"toggleTag("+gi+","+si+",'"+tag+"')\" "
+         +"style=\"font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid "+bc+";cursor:pointer;margin:1px;background:"+bg+";color:"+col+"\">"+tag+"</button>";
+  });
+  html+="</td>";
+  return html;
+}
+
+function toggleTag(gi,si,tag){
+  var s=groups[gi].staff[si];
+  if(!s.tags)s.tags=[];
+  var idx=s.tags.indexOf(tag);
+  if(idx>=0)s.tags.splice(idx,1);
+  else s.tags.push(tag);
+  document.getElementById("panel-staffmgmt").innerHTML=buildStaffMgmt();
+  gasSave();
+}
+
+function renderStaffTags(tags){
+  if(!tags||tags.length===0)return "";
+  return tags.map(function(t){
+    var c=TAG_COLORS[t]||"#666";
+    return '<span class="tl-tag" style="background:'+c+'">'+t+'</span>';
+  }).join("");
+}
+
 function buildWishOffRow(wo,d,nowPct){
   var sN=wo.name.replace(/'/g,"\\'");
   var wBW=bw(wo.wish);
@@ -1485,7 +1524,7 @@ function buildDailyView(d){
   var totH=workers.reduce(function(a,w){return a+calcNetH(w.disp,w.name,d);},0);var totWage=workers.reduce(function(a,w){return a+(w.wage?Math.round(calcNetH(w.disp,w.name,d)*w.wage):0);},0);
   var now=new Date(),nowPct=-1;if(now.getFullYear()===year&&now.getMonth()===month&&now.getDate()===d)nowPct=Math.round((now.getHours()+now.getMinutes()/60-OPEN)/sp*100);
   var hRow='<div class="tl-hours-row">';for(var hh=OPEN;hh<=CLOSE;hh++)hRow+='<div class="tl-hour" style="width:'+hw+'%;flex-shrink:0">'+hh+"</div>";hRow+="</div>";
-  var tlRows="";groups.forEach(function(g){var gw=workers.filter(function(w){return w.group===g.label;});if(!gw.length)return;tlRows+='<div class="tl-group-label">'+g.label+"</div>";gw.forEach(function(w){var cBW=w.conf?bw(w.conf):{l:0,w:0},wBW=w.wish?bw(w.wish):{l:0,w:0};var cp=w.conf?w.conf.split("-"):null,wp=w.wish?w.wish.split("-"):null;var cLbl=cp?fT(parseInt(cp[0]))+"〜"+fT(parseInt(cp[1])):null;var wLbl=wp?fT(parseInt(wp[0]))+"〜"+fT(parseInt(wp[1])):null;var sN=w.name.replace(/'/g,"\\'");tlRows+='<div class="tl-row"><div class="tl-name-wrap"><div class="tl-name">'+w.name+"</div>"+(w.wish?'<div class="tl-wish-sub">希望 '+wLbl+"</div>":"")+(w.conf?'<div class="tl-conf-sub"><span style="font-size:8px;color:var(--txt2);font-weight:400">確定</span> '+cLbl+"</div>":"")+'</div><div class="tl-track" onclick="openDailyEdit(\''+sN+"',"+d+')">'+(nowPct>=0?'<div class="tl-now-line" style="left:'+nowPct+'%"><div class="tl-now-label">NOW</div></div>':"")+(w.conf&&cBW.w>0?'<div class="tl-bar tl-bar-c" style="left:'+cBW.l+'%;width:'+cBW.w+'%">'+(cBW.w>15?cLbl:"")+"</div>":"")
+  var tlRows="";groups.forEach(function(g){var gw=workers.filter(function(w){return w.group===g.label;});if(!gw.length)return;tlRows+='<div class="tl-group-label">'+g.label+"</div>";gw.forEach(function(w){var cBW=w.conf?bw(w.conf):{l:0,w:0},wBW=w.wish?bw(w.wish):{l:0,w:0};var cp=w.conf?w.conf.split("-"):null,wp=w.wish?w.wish.split("-"):null;var cLbl=cp?fT(parseInt(cp[0]))+"〜"+fT(parseInt(cp[1])):null;var wLbl=wp?fT(parseInt(wp[0]))+"〜"+fT(parseInt(wp[1])):null;var sN=w.name.replace(/'/g,"\\'");tlRows+='<div class="tl-row"><div class="tl-name-wrap"><div class="tl-name">'+w.name+"</div>"+(w.wish?'<div class="tl-wish-sub">希望 '+wLbl+"</div>":"")+(w.conf?'<div class="tl-conf-sub"><span style="font-size:8px;color:var(--txt2);font-weight:400">確定</span> '+cLbl+"</div>":"")+(w.tags&&w.tags.length>0?"<div class=\"tl-tags\">"+w.tags.map(function(t){var c=TAG_COLORS[t]||"#666";return"<span class=\"tl-tag\" style=\"background:"+c+"\">"+t+"</span>";}).join("")+"</div>":"")+'</div><div class="tl-track" onclick="openDailyEdit(\''+sN+"',"+d+')">'+(nowPct>=0?'<div class="tl-now-line" style="left:'+nowPct+'%"><div class="tl-now-label">NOW</div></div>':"")+(w.conf&&cBW.w>0?'<div class="tl-bar tl-bar-c" style="left:'+cBW.l+'%;width:'+cBW.w+'%">'+(cBW.w>15?cLbl:"")+"</div>":"")
 +(function(){
   var br=computeBreaks(d);
   var bi=br?br[w.name]:null;
@@ -1513,7 +1552,7 @@ function buildDailyView(d){
   return '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">'+chips+'<div class="daily-summary"><div style="font-size:15px;font-weight:600;color:'+dColor+';margin-right:8px">'+mn+"月"+d+"日（"+DOW[dow]+"）"+hnL+'</div><div class="dsumcard"><div class="dval">'+workers.length+'名</div><div class="dlbl">出勤</div></div><div class="dsumcard" style="margin-left:12px"><div class="dval">'+Math.round(totH*10)/10+'h</div><div class="dlbl">総時間</div></div><div class="dsumcard" style="margin-left:12px"><div class="dval" style="font-size:13px">¥'+totWage.toLocaleString()+'</div><div class="dlbl">人件費</div></div><div style="margin-left:auto;display:flex;gap:8px;align-items:center"><select id="adj-priority-sel" onchange="adjPriority=this.value" style="font-size:10px;border:1px solid var(--bd2);border-radius:var(--r);padding:4px 6px;color:var(--txt);background:var(--bg)"><option value="long-trim">長いシフトを削る</option><option value="short-off">短いシフトを休みに</option></select><button onclick="autoAdjustOverstaffed('+d+')" style="font-size:11px;font-weight:600;background:#E24B4A;color:#fff;border:none;border-radius:var(--r);padding:5px 10px;cursor:pointer">⚡ 過多調整</button><div class="legend-item"><div class="legend-dot" style="background:#B5D4F4"></div><span style="font-size:11px;color:var(--txt2)">確定</span></div><div class="legend-item"><div class="legend-dot" style="background:#FAEEDA"></div><span style="font-size:11px;color:var(--txt2)">希望</span></div></div></div><div class="daily-tl-body"><div style="min-width:460px">'+hRow+tlRows+"</div>"+offSec+hcChart+"</div></div>";
 }
 
-function buildStaffMgmt(){var h='<div class="staff-mgmt"><div class="staff-mgmt-header"><h3>スタッフ管理</h3></div>';groups.forEach(function(g,gi){h+='<div class="group-section"><div class="group-title-row"><span class="group-title">'+g.label+'</span><button class="add-group-member" onclick="addStaff('+gi+')">＋ 追加</button></div>';if(!g.staff.length){h+='<div style="font-size:12px;color:var(--txt2);padding:8px 4px">「＋ 追加」から登録してください</div>';}else{h+='<table class="staff-tbl"><thead><tr><th style="width:28%">氏名</th><th style="width:15%">時給</th><th style="width:17%">PIN</th><th style="width:12%;text-align:center">社保</th><th style="width:18%"></th></tr></thead><tbody>';g.staff.forEach(function(s,si){h+='<tr><td><input type="text" value="'+s.name+'" placeholder="氏名" onchange="updStaff('+gi+','+si+',\'name\',this.value)"></td><td><input type="tel" value="'+(s.wage||"")+'" placeholder="1150" onchange="updStaff('+gi+','+si+',\'wage\',this.value)"></td><td><input type="tel" id="pi-'+gi+'-'+si+'" value="'+s.pin+'" placeholder="A12-B34" onchange="updStaffPin('+gi+','+si+',this)"></td><td style="text-align:center">'+( s.shIns?'<button onclick="updStaff('+gi+','+si+',\'shIns\',false);document.getElementById(\'panel-staffmgmt\').innerHTML=buildStaffMgmt();" style="font-size:10px;font-weight:700;background:#2563EB;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer">社保</button>':'<button onclick="updStaff('+gi+','+si+',\'shIns\',true);document.getElementById(\'panel-staffmgmt\').innerHTML=buildStaffMgmt();" style="font-size:10px;font-weight:400;background:none;color:var(--txt2);border:1px solid var(--bd2);border-radius:4px;padding:3px 8px;cursor:pointer">なし</button>')+'</td><td style="text-align:center"><button class="del-btn" onclick="delStaff('+gi+','+si+')">削除</button></td></tr><tr><td colspan="5" style="padding:0 4px 4px;font-size:10px;color:var(--red);display:none" id="pe-'+gi+'-'+si+'"></td></tr>';});h+='</tbody></table>';}h+='</div>';});return h+"</div>";}
+function buildStaffMgmt(){var h='<div class="staff-mgmt"><div class="staff-mgmt-header"><h3>スタッフ管理</h3></div>';groups.forEach(function(g,gi){h+='<div class="group-section"><div class="group-title-row"><span class="group-title">'+g.label+'</span><button class="add-group-member" onclick="addStaff('+gi+')">＋ 追加</button></div>';if(!g.staff.length){h+='<div style="font-size:12px;color:var(--txt2);padding:8px 4px">「＋ 追加」から登録してください</div>';}else{h+='<table class="staff-tbl"><thead><tr><th style="width:24%">氏名</th><th style="width:13%">時給</th><th style="width:15%">PIN</th><th style="width:10%;text-align:center">社保</th><th style="width:22%">タグ</th><th style="width:16%"></th></tr></thead><tbody>';g.staff.forEach(function(s,si){h+='<tr><td><input type="text" value="'+s.name+'" placeholder="氏名" onchange="updStaff('+gi+','+si+',\'name\',this.value)"></td><td><input type="tel" value="'+(s.wage||"")+'" placeholder="1150" onchange="updStaff('+gi+','+si+',\'wage\',this.value)"></td><td><input type="tel" id="pi-'+gi+'-'+si+'" value="'+s.pin+'" placeholder="A12-B34" onchange="updStaffPin('+gi+','+si+',this)"></td><td style="text-align:center">'+( s.shIns?'<button onclick="updStaff('+gi+','+si+',\'shIns\',false);document.getElementById(\'panel-staffmgmt\').innerHTML=buildStaffMgmt();" style="font-size:10px;font-weight:700;background:#2563EB;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer">社保</button>':'<button onclick="updStaff('+gi+','+si+',\'shIns\',true);document.getElementById(\'panel-staffmgmt\').innerHTML=buildStaffMgmt();" style="font-size:10px;font-weight:400;background:none;color:var(--txt2);border:1px solid var(--bd2);border-radius:4px;padding:3px 8px;cursor:pointer">なし</button>')+'</td>'+renderTagCell(g,s,gi,si)+'<td style="text-align:center"><button class="del-btn" onclick="delStaff('+gi+','+si+')">削除</button></td></tr><tr><td colspan="6" style="padding:0 4px 4px;font-size:10px;color:var(--red);display:none" id="pe-'+gi+'-'+si+'"></td></tr>';});h+='</tbody></table>';}h+='</div>';});return h+"</div>";}
 
 // ===== スタッフ画面 =====
 function renderStaff(){
@@ -1945,7 +1984,7 @@ function buildStats(){
     var rows=[];
     g.staff.forEach(function(s){
       var h=0;days.forEach(function(x){var sh=gDisp(s.name,x.d);h+=calcNetH(sh,s.name,x.d);});
-      var hw=0;days.forEach(function(x){var wsh=wishData[key(s.name,x.d)]||null;if(wsh)hw+=calcRawH(wsh);});
+      var hw=0;days.forEach(function(x){var wsh=wishData[key(s.name,x.d)]||null;if(wsh)hw+=calcNetH(wsh,s.name,x.d);});
       var h2=Math.round(h*10)/10,hw2=Math.round(hw*10)/10;
       var diff=Math.round((h-hw)*10)/10;
       var wage=s.wage?Math.round(h*s.wage):null;
